@@ -1,0 +1,35 @@
+<html theme="dark">
+    <head>
+        <link rel="stylesheet" href="https://assets.agapedimas.com/ui/v3/style.css"/>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    </head>
+    <body>
+        <style>
+            body
+            {
+                display: grid;
+                padding: 30px;
+                gap: 10px;
+                grid-auto-flow: column;
+                grid-auto-columns: 1fr 1fr 100px;
+            }
+        </style>
+        <textarea placeholder="Code" id="Code"></textarea>
+        <textarea placeholder="Input" id="Input"></textarea>
+        <button id="Send">Send</button>
+        <script>
+            Send.onclick = async function()
+            {
+                try 
+                {
+                    let a = await $.post("/", {code: Code.value, input: Input.value});
+                    alert(a.output ? a.output : a.error);
+                }
+                catch(err)
+                {
+                    alert(err.responseText);
+                }
+            }
+        </script>
+    </body>
+</html>

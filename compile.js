@@ -3,40 +3,53 @@ const fs = require("fs");
 const path = require("path");
 const { exec } = require("child_process");
 
-Server.Push.Get("dimas", (req, res) => 
+Server.Push.Get("", (req, res) => 
 {
-    res.send("hai");
-    
-    // Java Code Template
-    const javaCode = `
-    public class Main {
-        public static void main(String[] args) {
-            System.out.println("Hello, Java from Node.js!");
-        }
+    res.sendFile(path.join(__dirname, "index.html"));
+});
+Server.Push.Post("", (req, res) => 
+{    
+    let code = req.body.code;
+    let input = req.body.input;
+
+    if (code.trim() == "")
+    {
+        res.send({ output: null, error: "Cannot parse empty file" });
+        return;
     }
-    `;
 
-    // Write to a File
-    const javaFilePath = path.join(__dirname, "/tmp/Main.java");
-    fs.writeFileSync(javaFilePath, javaCode, "utf8");
+    let className = code.match(/public class (.*?)\n/) || code.match(/public class (.*?){/) || ["Main"];
+    className = className[0];
+    className = className.replace("public class", "");
+    className = className.replace("{", "");
+    className = className.trim() == "" ? "Main" : className.trim();
 
-    // Example Usage
-    compileJava(javaFilePath, (compileResult) => 
+    const folderPath = path.join(__dirname, "\\tmp\\" + Date.now());
+    const filePath = folderPath + "\\" + className + ".java";
+    const inputPath = folderPath + "\\input.txt";
+
+    fs.mkdirSync(folderPath);
+    fs.writeFileSync(filePath, code, "utf8");
+    
+    if (input.trim() != "")
+        fs.writeFileSync(inputPath, input, "utf8");
+
+    compileJava(filePath, (compileResult) => 
     {
         if (!compileResult.success) 
         {
-            console.error("Compilation Error:", compileResult.error);
+            res.send({ output: null, error: compileResult.error });
             return;
         }
-        console.log("Compilation Successful!");
-        runJava("Main", javaFilePath, (runResult) => 
+
+        runJava(className, filePath, (runResult) => 
         {
             if (!runResult.success) 
             {
-                console.error("Runtime Error:", runResult.error);
+                res.send({ output: null, error: runResult.error });
                 return;
             }
-            console.log("Program Output:", runResult.output);
+            res.send({ output: runResult.output, error: null });
         });
     });
 });
@@ -46,11 +59,14 @@ Server.Push.Get("dimas", (req, res) =>
 function compileJava(filePath, callback) 
 {
     const directory = path.dirname(filePath);
-    exec("javac \"" + filePath + "\"", { cwd: directory }, (error, stdout, stderr) => 
+    exec("javac \"" + filePath + "\"", { cwd: directory }, async (error, stdout, stderr) => 
     {
         if (error)
         {
-            callback({ success: false, error: stderr || error.message });
+            let err = stderr || error.message;
+            err = err.replaceAll(directory + "\\", "");
+            deleteDirectory(directory);
+            callback({ success: false, error:  err });
             return;
         }
         callback({ success: true });
@@ -61,12 +77,23 @@ function compileJava(filePath, callback)
 function runJava(className, filePath, callback) 
 {
     const directory = path.dirname(filePath);
-    exec("java " + className, { cwd: directory }, (error, stdout, stderr) => 
+    const input = fs.existsSync(directory + "\\" + "input.txt") ? "< input.txt" : "";
+
+    exec("java " + className + input, { cwd: directory }, async (error, stdout, stderr) => 
     {
+        deleteDirectory(directory);
         if (error) {
             callback({ success: false, error: stderr || error.message });
             return;
         }
         callback({ success: true, output: stdout });
     });
+}
+
+async function deleteDirectory(directory)
+{
+    for (let classe of fs.readdirSync(directory))
+        await fs.unlink(directory + "\\" + classe, o => o);
+    
+    fs.rmSync(directory, {recursive: true}, o => o);
 }
