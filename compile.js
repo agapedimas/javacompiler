@@ -38,7 +38,7 @@ Server.Push.Post("", (req, res) =>
     {
         if (!compileResult.success) 
         {
-            res.send({ output: null, error: compileResult.error });
+            res.send({ output: null, error: path.dirname(filePath) + "\n\n" + compileResult.error });
             return;
         }
 
